@@ -166,6 +166,7 @@ public class QRView:NSObject,FlutterPlatformView {
                                 let result : [String:Any] = [
                                     "code": stringValue,
                                     "type": typeString,
+                                    "success" : true,
                                     "height" : code.bounds.height,
                                     "width" : code.bounds.width,
                                     "minX" : code.bounds.minX,
