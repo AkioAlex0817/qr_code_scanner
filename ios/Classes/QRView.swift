@@ -163,7 +163,7 @@ public class QRView:NSObject,FlutterPlatformView {
                                         return
                                 }
                                 guard let stringValue = code.stringValue else { continue }
-                                let result = [
+                                let result : [String:Any] = [
                                     "code": stringValue,
                                     "type": typeString,
                                     "height" : code.bounds.height,
