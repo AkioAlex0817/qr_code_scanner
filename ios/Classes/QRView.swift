@@ -163,7 +163,16 @@ public class QRView:NSObject,FlutterPlatformView {
                                         return
                                 }
                                 guard let stringValue = code.stringValue else { continue }
-                               let result = ["code": stringValue, "type": typeString]
+                                let result = [
+                                    "code": stringValue,
+                                    "type": typeString,
+                                    "height" : code.bounds.height,
+                                    "width" : code.bounds.width,
+                                    "minX" : code.bounds.minX,
+                                    "minY" : code.bounds.minY,
+                                    "maxX" : code.bounds.maxX,
+                                    "maxY" : code.bounds.maxY
+                                ]
                                 if allowedBarcodeTypes.count == 0 || allowedBarcodeTypes.contains(code.type) {
                                     self?.channel.invokeMethod("onRecognizeQR", arguments: result)
                                 }

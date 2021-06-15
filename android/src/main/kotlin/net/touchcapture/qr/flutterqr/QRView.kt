@@ -3,6 +3,8 @@ package net.touchcapture.qr.flutterqr
 import android.Manifest
 import android.app.Activity
 import android.app.Application
+import android.content.Context
+import android.content.res.Resources
 import android.content.pm.PackageManager
 import android.hardware.Camera.CameraInfo
 import android.os.Build
@@ -18,6 +20,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.PluginRegistry
 import io.flutter.plugin.platform.PlatformView
+import kotlin.math.*
 
 
 class QRView(messenger: BinaryMessenger, id: Int, private val params: HashMap<String, Any>) :
@@ -75,7 +78,7 @@ class QRView(messenger: BinaryMessenger, id: Int, private val params: HashMap<St
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
-        when(call.method) {
+        when (call.method) {
             "startScan" -> startScan(call.arguments as? List<Int>, result)
             "stopScan" -> stopScan()
             "flipCamera" -> flipCamera(result)
@@ -108,7 +111,7 @@ class QRView(messenger: BinaryMessenger, id: Int, private val params: HashMap<St
             barcodeView!!.pause()
             val settings = barcodeView!!.cameraSettings
 
-            if(settings.requestedCameraId == CameraInfo.CAMERA_FACING_FRONT)
+            if (settings.requestedCameraId == CameraInfo.CAMERA_FACING_FRONT)
                 settings.requestedCameraId = CameraInfo.CAMERA_FACING_BACK
             else
                 settings.requestedCameraId = CameraInfo.CAMERA_FACING_FRONT
@@ -228,11 +231,37 @@ class QRView(messenger: BinaryMessenger, id: Int, private val params: HashMap<St
                 object : BarcodeCallback {
                     override fun barcodeResult(result: BarcodeResult) {
                         if (allowedBarcodeTypes.size == 0 || allowedBarcodeTypes.contains(result.barcodeFormat)) {
-                            val code = mapOf(
-                                    "code" to result.text,
-                                    "type" to result.barcodeFormat.name,
-                                    "rawBytes" to result.rawBytes)
-                            channel.invokeMethod("onRecognizeQR", code)
+                            val density = Resources.getSystem().displayMetrics.density
+                            val points = result.resultPoints
+                            if (points.size >= 2) {
+                                val startPoint = points[0]
+                                val endPoint = points[1]
+                                val code = mapOf(
+                                        "code" to result.text,
+                                        "type" to result.barcodeFormat.name,
+                                        "success" to true,
+                                        "height" to (abs(endPoint.y - startPoint.y) / density),
+                                        "width" to (abs(endPoint.x - startPoint.x) / density),
+                                        "minX" to (min(endPoint.x, startPoint.x) / density),
+                                        "minY" to (min(endPoint.y, startPoint.y) / density),
+                                        "maxX" to (max(endPoint.x, startPoint.x) / density),
+                                        "maxY" to (max(endPoint.y, startPoint.y) / density),
+                                        "rawBytes" to result.rawBytes)
+                                channel.invokeMethod("onRecognizeQR", code)
+                            } else {
+                                val code = mapOf(
+                                        "code" to result.text,
+                                        "type" to result.barcodeFormat.name,
+                                        "success" to false,
+                                        "height" to 1,
+                                        "width" to 0,
+                                        "minX" to 0,
+                                        "minY" to 0,
+                                        "maxX" to 0,
+                                        "maxY" to 0,
+                                        "rawBytes" to result.rawBytes)
+                                channel.invokeMethod("onRecognizeQR", code)
+                            }
                         }
 
                     }
@@ -280,9 +309,9 @@ class QRView(messenger: BinaryMessenger, id: Int, private val params: HashMap<St
         }
     }
 
-    override fun onRequestPermissionsResult( requestCode: Int,
-                                             permissions: Array<out String>?,
-                                             grantResults: IntArray): Boolean {
+    override fun onRequestPermissionsResult(requestCode: Int,
+                                            permissions: Array<out String>?,
+                                            grantResults: IntArray): Boolean {
 
         if (requestCode == Shared.CAMERA_REQUEST_ID && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             permissionGranted = true

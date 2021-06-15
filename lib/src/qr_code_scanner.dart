@@ -73,9 +73,7 @@ class _QRViewState extends State<QRView> {
     return NotificationListener(
       onNotification: onNotification,
       child: SizeChangedLayoutNotifier(
-        child: (widget.overlay != null)
-            ? _getPlatformQrViewWithOverlay()
-            : _getPlatformQrView(),
+        child: (widget.overlay != null) ? _getPlatformQrViewWithOverlay() : _getPlatformQrView(),
       ),
     );
   }
@@ -87,9 +85,7 @@ class _QRViewState extends State<QRView> {
   }
 
   Future<void> updateDimensions() async {
-    await QRViewController.updateDimensions(
-        widget.key as GlobalKey<State<StatefulWidget>>, _channel,
-        overlay: widget.overlay);
+    await QRViewController.updateDimensions(widget.key as GlobalKey<State<StatefulWidget>>, _channel, overlay: widget.overlay);
   }
 
   bool onNotification(notification) {
@@ -124,8 +120,7 @@ class _QRViewState extends State<QRView> {
           _platformQrView = AndroidView(
             viewType: 'net.touchcapture.qr.flutterqr/qrview',
             onPlatformViewCreated: _onPlatformViewCreated,
-            creationParams:
-                _QrCameraSettings(cameraFacing: widget.cameraFacing).toMap(),
+            creationParams: _QrCameraSettings(cameraFacing: widget.cameraFacing).toMap(),
             creationParamsCodec: StandardMessageCodec(),
           );
           break;
@@ -133,14 +128,12 @@ class _QRViewState extends State<QRView> {
           _platformQrView = UiKitView(
             viewType: 'net.touchcapture.qr.flutterqr/qrview',
             onPlatformViewCreated: _onPlatformViewCreated,
-            creationParams:
-                _QrCameraSettings(cameraFacing: widget.cameraFacing).toMap(),
+            creationParams: _QrCameraSettings(cameraFacing: widget.cameraFacing).toMap(),
             creationParamsCodec: StandardMessageCodec(),
           );
           break;
         default:
-          throw UnsupportedError(
-              "Trying to use the default qrview implementation for $defaultTargetPlatform but there isn't a default one");
+          throw UnsupportedError("Trying to use the default qrview implementation for $defaultTargetPlatform but there isn't a default one");
       }
     }
     return _platformQrView;
@@ -150,13 +143,7 @@ class _QRViewState extends State<QRView> {
     _channel = MethodChannel('net.touchcapture.qr.flutterqr/qrview_$id');
 
     // Start scan after creation of the view
-    final controller = QRViewController._(
-        _channel,
-        widget.key as GlobalKey<State<StatefulWidget>>?,
-        widget.onPermissionSet,
-        widget.cameraFacing)
-      .._startScan(widget.key as GlobalKey<State<StatefulWidget>>,
-          widget.overlay, widget.formatsAllowed);
+    final controller = QRViewController._(_channel, widget.key as GlobalKey<State<StatefulWidget>>?, widget.onPermissionSet, widget.cameraFacing).._startScan(widget.key as GlobalKey<State<StatefulWidget>>, widget.overlay, widget.formatsAllowed);
 
     // Initialize the controller for controlling the QRView
     widget.onQRViewCreated(controller);
@@ -178,8 +165,7 @@ class _QrCameraSettings {
 }
 
 class QRViewController {
-  QRViewController._(MethodChannel channel, GlobalKey? qrKey,
-      PermissionSetCallback? onPermissionSet, CameraFacing cameraFacing)
+  QRViewController._(MethodChannel channel, GlobalKey? qrKey, PermissionSetCallback? onPermissionSet, CameraFacing cameraFacing)
       : _channel = channel,
         _cameraFacing = cameraFacing {
     _channel.setMethodCallHandler((call) async {
@@ -187,13 +173,21 @@ class QRViewController {
         case 'onRecognizeQR':
           if (call.arguments != null) {
             final args = call.arguments as Map;
+            print(args);
             final code = args['code'] as String;
             final rawType = args['type'] as String;
+            final success = args['success'] as bool;
+            final height = args['height'].toDouble() ?? 0;
+            final width = args['width'].toDouble() ?? 0;
+            final minX = args['minX'].toDouble() ?? 0;
+            final minY = args['minY'].toDouble() ?? 0;
+            final maxX = args['maxX'].toDouble() ?? 0;
+            final maxY = args['maxY'].toDouble() ?? 0;
             // Raw bytes are only supported by Android.
             final rawBytes = args['rawBytes'] as List<int>?;
             final format = BarcodeTypesExtension.fromString(rawType);
             if (format != BarcodeFormat.unknown) {
-              final barcode = Barcode(code, format, rawBytes);
+              final barcode = Barcode(code, format, rawBytes, success, height, width, minX, minY, maxX, maxY);
               _scanUpdateController.sink.add(barcode);
             } else {
               throw Exception('Unexpected barcode type $rawType');
@@ -214,22 +208,20 @@ class QRViewController {
 
   final MethodChannel _channel;
   final CameraFacing _cameraFacing;
-  final StreamController<Barcode> _scanUpdateController =
-      StreamController<Barcode>();
+  final StreamController<Barcode> _scanUpdateController = StreamController<Barcode>();
 
   Stream<Barcode> get scannedDataStream => _scanUpdateController.stream;
 
   bool _hasPermissions = false;
+
   bool get hasPermissions => _hasPermissions;
 
   /// Starts the barcode scanner
-  Future<void> _startScan(GlobalKey key, QrScannerOverlayShape? overlay,
-      List<BarcodeFormat>? barcodeFormats) async {
+  Future<void> _startScan(GlobalKey key, QrScannerOverlayShape? overlay, List<BarcodeFormat>? barcodeFormats) async {
     // We need to update the dimension before the scan is started.
     try {
       await QRViewController.updateDimensions(key, _channel, overlay: overlay);
-      return await _channel.invokeMethod(
-          'startScan', barcodeFormats?.map((e) => e.asInt()).toList() ?? []);
+      return await _channel.invokeMethod('startScan', barcodeFormats?.map((e) => e.asInt()).toList() ?? []);
     } on PlatformException catch (e) {
       throw CameraException(e.code, e.message);
     }
@@ -240,8 +232,7 @@ class QRViewController {
     try {
       var cameraFacing = await _channel.invokeMethod('getCameraInfo') as int;
       if (cameraFacing == -1) return _cameraFacing;
-      return CameraFacing
-          .values[await _channel.invokeMethod('getCameraInfo') as int];
+      return CameraFacing.values[await _channel.invokeMethod('getCameraInfo') as int];
     } on PlatformException catch (e) {
       throw CameraException(e.code, e.message);
     }
@@ -250,8 +241,7 @@ class QRViewController {
   /// Flips the camera between available modes
   Future<CameraFacing> flipCamera() async {
     try {
-      return CameraFacing
-          .values[await _channel.invokeMethod('flipCamera') as int];
+      return CameraFacing.values[await _channel.invokeMethod('flipCamera') as int];
     } on PlatformException catch (e) {
       throw CameraException(e.code, e.message);
     }
@@ -305,8 +295,7 @@ class QRViewController {
   /// Returns which features are available on device.
   Future<SystemFeatures> getSystemFeatures() async {
     try {
-      var features =
-          await _channel.invokeMapMethod<String, dynamic>('getSystemFeatures');
+      var features = await _channel.invokeMapMethod<String, dynamic>('getSystemFeatures');
       if (features != null) {
         return SystemFeatures.fromJson(features);
       }
@@ -323,20 +312,14 @@ class QRViewController {
   }
 
   /// Updates the view dimensions for iOS.
-  static Future<bool> updateDimensions(GlobalKey key, MethodChannel channel,
-      {QrScannerOverlayShape? overlay}) async {
+  static Future<bool> updateDimensions(GlobalKey key, MethodChannel channel, {QrScannerOverlayShape? overlay}) async {
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       // Add small delay to ensure the render box is loaded
       await Future.delayed(Duration(milliseconds: 100));
       if (key.currentContext == null) return false;
       final renderBox = key.currentContext!.findRenderObject() as RenderBox;
       try {
-        await channel.invokeMethod('setDimensions', {
-          'width': renderBox.size.width,
-          'height': renderBox.size.height,
-          'scanArea': overlay?.cutOutSize ?? 0,
-          'scanAreaOffset': overlay?.cutOutBottomOffset ?? 0
-        });
+        await channel.invokeMethod('setDimensions', {'width': renderBox.size.width, 'height': renderBox.size.height, 'scanArea': overlay?.cutOutSize ?? 0, 'scanAreaOffset': overlay?.cutOutBottomOffset ?? 0});
         return true;
       } on PlatformException catch (e) {
         throw CameraException(e.code, e.message);
